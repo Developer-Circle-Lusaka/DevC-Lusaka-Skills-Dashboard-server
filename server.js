@@ -19,32 +19,68 @@ const typeDefs = gql`
   # This "Book" type can be used in other type declarations.
   type User {
     name: String
-    age: String
     skills:String
   }
 
   # The "Query" type is the root of all GraphQL queries.
   # (A "Mutation" type will be covered later on.)
   type Query {
-    users: [User],
-    jobs:[Job]
+    developers: [developer],
+  }
+  
+
+  type skill{
+    name:String,
+    duration:String
   }
 
-
-  type Job {
+  type project{
     title:String,
-    description:String,
-    langauges:String
+    description:String
   }
 
-
+  type developer{
+    name: String,
+    projects:[project],
+    skills:[skill],
+    image:String,
+    linkdedIn:String,
+    github:String,
+  }
 
   
 `;
 
 const  getUsers= async()=>{
     try {
-        return await developer.find({})
+       const developers=[{
+         name:'mbuyu',
+         image:'photo',
+         github:'git.hub.com',
+         linkdedIn:'mbuyu',
+         projects:[
+           {title:'sorry project',description:'nothing'}
+          ],
+        
+          skills:[{name:'java',duration:1}
+          
+        ]
+       }]
+
+        // developer.createOne({
+        //   name:'test',
+        //   image:'nkdk',
+        //   github:'ghub',
+        //   linkdedIn:'hllf',
+        //   projects:[
+        //     {title:'sorry project',description:'nothing'}
+        //    ],
+         
+        //    skills:[{name:'java',duration:1}
+           
+        //  ]
+        // }).exec()
+        return developers//await developer.find({})
     } catch (error) {
          console.log(error)
     }   
@@ -62,8 +98,7 @@ const getJobs= async()=>{
 
 const resolvers = {
     Query: {
-      users:getUsers,
-      jobs:getJobs,
+      developers:getUsers
     },
   };
 

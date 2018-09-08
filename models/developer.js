@@ -3,9 +3,18 @@ const Schema = mongoose.Schema;
 
  const userSchema = new Schema({
     name: String,
-    age:String,
-    skills:String
+    projects:[{
+        title:String,
+        description:String
+      }],
+    skills:[{
+        skill:String,
+        duration:String 
+    }],
+    image:String,
+    linkdedIn:String,
+    github:String,
   
 });
 let Model = mongoose.model('Developer', userSchema,'developers');
-module.exports = Model;
+exports = Model;
