@@ -7,20 +7,31 @@ import config from '../config'
 
 // route gets a list of the developers from the database 
 router.get('/developers',async(req,res)=>{
+    const token=req.headers['x-access-token']
   try {
-      const developers= await developer.find({}).exec()
-      const response={
-          status:200,
-          data:developers
-      }
-     return res.send(response)
+      /**
+       check to see if token exists
+       */
+     if(!token) return res.status(401).json({status:false,message:'No access Token'})
+    
+     //if token exists verify it and return data if token is verified.
+    const result= await jwt.verify(token,config.secret)
+    if(result){
+        const developers= await developer.find({}).select('-password').exec()
+        const response={
+            status:true,
+            data:developers
+        }
+       return res.status(200).json(response)
+    }
+
   } catch (error) {
     const response={
-        status:500,
-        error:"Something went wrong"
+        status:false,
+        error:`Something went wrong: ${error.message}`
     }
     console.log(error)
-    return res.json(response)
+    return res.status(500).json(response)
   }
 });
 
@@ -37,10 +48,10 @@ router.post('/register',async(req,res)=>{
           //if user exists  warn the user that email is already taken
           const {email}=user
           const response={
-              status:200,
+              status:true,
               message:`${email} has already be taken by another user.`
           }
-         return res.json(response)
+         return res.status(401).json(response)
 
         }else{
           //create token and send to the user to store in their state 
@@ -58,24 +69,34 @@ router.post('/register',async(req,res)=>{
                 name:name
             }
 
-            const result= await  developer.create(_userWithPasswordEncrypted) 
-            const response={
-                status:200,
-                data:result,
-                token:null
-               
+            const createdUser= await  developer.create(_userWithPasswordEncrypted) 
+            if(createdUser){
+                const token=jwt.sign({
+                    email:createdUser.email,
+                    _id:createdUser._id
+                },config.secret,{
+                    expiresIn:'1h'
+                })
+                const response={
+                    status:true,
+                    user:user,
+                    token:token
+                   
+                }
+                
+             return res.status(200).json(response)
             }
             
-         return   res.json(response)
+     
         }
         
-    } catch (error) {
+    }catch (error) {
          const response={
-             status:500,
-             error:'Something went wrong'
+             status:true,
+             error:`Something went wrong. ${error.message}`
          }
          console.log(error)
-       return  res.json(response)
+       return  res.status(500).json(response)
         
     }
 })
@@ -87,15 +108,19 @@ router.post('/login',async(req,res)=>{
     const _returningUser=req.body
 
     try {
-
+        /*
+         Get the user with the credentials, 
+        */
         const user= await developer.findOne({email:_returningUser.email}).exec()
       if(user){
           /*
-           compares the user password against those in the database 
+         if account found compare the password 
+         with hashed password in the db using jwt's compare function. 
           */
           const result= await compare(_returningUser.password,user.password)
           if(result){
-
+            //  If user is found and hashed password match, create token using the email and user id
+            // using the jwt.sign function.
             const token=jwt.sign({
                 email:user.email,
                 _id:user._id
@@ -112,7 +137,7 @@ router.post('/login',async(req,res)=>{
           } else{
             return res.status(401).json({
                 status: false,
-                message:"Not Authorization"
+                message:"Not Authorized"
              });
           }
           //create token and send to the user to store in their state 
@@ -121,22 +146,25 @@ router.post('/login',async(req,res)=>{
       }else{
     //responsd to user when wrong details are provided.
         const response={
-            status:404,
+            status:false,
             message:'Account with details provided doesnt exist. Try Again.'
         }
 
-        return res.json(response)
+        return res.status(401).json(response)
       }
 
 
     } catch (error) {
           const response={
-             status:500,
+             status:false,
              error:'Something went wrong'
          }
          console.log(error)
-        return res.json(response)
+        return res.status(500).json(response)
     }
 })
+
+
+
 
 module.exports=router
