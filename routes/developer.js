@@ -4,36 +4,9 @@ import jwt from 'jsonwebtoken'
 const router= express.Router();
 import developer from '../models/developer'
 import config from '../config'
+import {TokenVerify} from '../auth/AuthVerify'
 
-// route gets a list of the developers from the database 
-router.get('/developers',async(req,res)=>{
-    const token=req.headers['x-access-token']
-  try {
-      /**
-       check to see if token exists
-       */
-     if(!token) return res.status(401).json({status:false,message:'No access Token'})
-    
-     //if token exists verify it and return data if token is verified.
-    const result= await jwt.verify(token,config.secret)
-    if(result){
-        const developers= await developer.find({}).select('-password').exec()
-        const response={
-            status:true,
-            data:developers
-        }
-       return res.status(200).json(response)
-    }
 
-  } catch (error) {
-    const response={
-        status:false,
-        error:`Something went wrong: ${error.message}`
-    }
-    console.log(error)
-    return res.status(500).json(response)
-  }
-});
 
 // registers new users
 router.post('/register',async(req,res)=>{
@@ -54,13 +27,7 @@ router.post('/register',async(req,res)=>{
          return res.status(401).json(response)
 
         }else{
-          //create token and send to the user to store in their state 
-          
-          //use the token to authenticate further requests.
-
-          // hash the password provided and then store it with the rest of the user's information
-          // once stored return the token and the user details except the password details
-          
+           // hash the password provided and then store it with the rest of the user's information
           const {password,email,name}= _newUser 
           const _hash_password= await hash(password,config.salt);
           const _userWithPasswordEncrypted={
@@ -71,15 +38,28 @@ router.post('/register',async(req,res)=>{
 
             const createdUser= await  developer.create(_userWithPasswordEncrypted) 
             if(createdUser){
+
+         // once user created create access token and  return it with the user details except the password details
                 const token=jwt.sign({
                     email:createdUser.email,
                     _id:createdUser._id
                 },config.secret,{
                     expiresIn:'1h'
                 })
+
+                
+                const {name:_name,projects,skills,email:_email}=createdUser
+
+                const _newUserWithoutPassword={
+                    name:_name,
+                    email:_email,
+                    projects:projects,
+                    skills:skills
+
+                }
                 const response={
                     status:true,
-                    user:user,
+                    data:_newUserWithoutPassword,
                     token:token
                    
                 }
@@ -95,7 +75,7 @@ router.post('/register',async(req,res)=>{
              status:true,
              error:`Something went wrong. ${error.message}`
          }
-         console.log(error)
+        console.log(error)
        return  res.status(500).json(response)
         
     }
@@ -164,7 +144,27 @@ router.post('/login',async(req,res)=>{
     }
 })
 
+// route gets a list of the developers from the database 
+router.get('/developers',TokenVerify,async(req,res)=>{
+  try {
 
+        const developers= await developer.find({}).select('-password').exec()
+        const response={
+            status:true,
+            data:developers
+        }
+       return res.status(200).json(response)
+    
+
+  }catch (error) {
+    const response={
+        status:false,
+        error:`Something went wrong: ${error.message}`
+    }
+    console.log(error)
+    return res.status(500).json(response)
+  }
+});
 
 
 module.exports=router
