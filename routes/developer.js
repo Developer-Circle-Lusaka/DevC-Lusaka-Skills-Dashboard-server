@@ -1,7 +1,9 @@
 import express from 'express'
+import {hash,compare} from 'bcrypt'
+import jwt from 'jsonwebtoken'
 const router= express.Router();
 import developer from '../models/developer'
-
+import config from '../config'
 
 // route gets a list of the developers from the database 
 router.get('/developers',async(req,res)=>{
@@ -11,14 +13,14 @@ router.get('/developers',async(req,res)=>{
           status:200,
           data:developers
       }
-      res.send(response)
+     return res.send(response)
   } catch (error) {
     const response={
         status:500,
         error:"Something went wrong"
     }
     console.log(error)
-    res.json(response)
+    return res.json(response)
   }
 });
 
@@ -30,6 +32,7 @@ router.post('/register',async(req,res)=>{
         // if email exists before creating account
         const user= await developer.findOne({email:_newUser.email}).exec()
         
+        
         if(user){
           //if user exists  warn the user that email is already taken
           const {email}=user
@@ -37,14 +40,25 @@ router.post('/register',async(req,res)=>{
               status:200,
               message:`${email} has already be taken by another user.`
           }
-          res.json(response)
+         return res.json(response)
 
         }else{
           //create token and send to the user to store in their state 
           
           //use the token to authenticate further requests.
 
-            const result= await  developer.create(_newUser) 
+          // hash the password provided and then store it with the rest of the user's information
+          // once stored return the token and the user details except the password details
+          
+          const {password,email,name}= _newUser 
+          const _hash_password= await hash(password,config.salt);
+          const _userWithPasswordEncrypted={
+                email:email,
+                password:_hash_password,
+                name:name
+            }
+
+            const result= await  developer.create(_userWithPasswordEncrypted) 
             const response={
                 status:200,
                 data:result,
@@ -52,7 +66,7 @@ router.post('/register',async(req,res)=>{
                
             }
             
-            res.json(response)
+         return   res.json(response)
         }
         
     } catch (error) {
@@ -61,7 +75,7 @@ router.post('/register',async(req,res)=>{
              error:'Something went wrong'
          }
          console.log(error)
-         res.json(response)
+       return  res.json(response)
         
     }
 })
@@ -70,11 +84,37 @@ router.post('/register',async(req,res)=>{
 // router handles all the login of users into the application
 
 router.post('/login',async(req,res)=>{
-    const _returningUser=res.body
+    const _returningUser=req.body
 
     try {
-        const user= await findOne({email:_returningUser.email,password:_returningUser.password}).exec()
+
+        const user= await developer.findOne({email:_returningUser.email}).exec()
       if(user){
+          /*
+           compares the user password against those in the database 
+          */
+          const result= await compare(_returningUser.password,user.password)
+          if(result){
+
+            const token=jwt.sign({
+                email:user.email,
+                _id:user._id
+            },config.secret,{
+                expiresIn:'1h'
+            })
+
+
+            return res.status(200).json({
+                status: true,
+                message:"Login Sucessful",
+                token:token
+             });
+          } else{
+            return res.status(401).json({
+                status: false,
+                message:"Not Authorization"
+             });
+          }
           //create token and send to the user to store in their state 
           //use the token to authenticate further requests.
 
@@ -85,7 +125,7 @@ router.post('/login',async(req,res)=>{
             message:'Account with details provided doesnt exist. Try Again.'
         }
 
-        res.json(response)
+        return res.json(response)
       }
 
 
@@ -95,7 +135,7 @@ router.post('/login',async(req,res)=>{
              error:'Something went wrong'
          }
          console.log(error)
-         res.json(response)
+        return res.json(response)
     }
 })
 

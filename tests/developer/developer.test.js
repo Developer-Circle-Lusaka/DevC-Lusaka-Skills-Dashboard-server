@@ -8,7 +8,7 @@ describe('GET /DEVELOPERS',()=>{
          .expect(200)
          .then(response=>{
               
-             expect(JSON.parse(response.text)).toBe({})
+             expect(JSON.parse(response.text)).toBe([])
          });
     });
 });
